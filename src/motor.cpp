@@ -38,7 +38,7 @@ ModeSharedPtr MotorKinco::allocMode(uint16_t mode) {
     std::scoped_lock map_lock(map_mutex_);
 
     std::unordered_map<uint16_t, ModeSharedPtr>::iterator it =
-        modes_.find(mode);
+      modes_.find(mode);
     if (it != modes_.end()) {
       res = it->second;
     }
@@ -50,7 +50,7 @@ bool MotorKinco::switchMode(uint16_t mode) {
   if (mode == MotorBase::No_Mode) {
     std::scoped_lock lock(mode_mutex_);
     selected_mode_.reset();
-    try { // try to set mode
+    try {  // try to set mode
       driver->universal_set_value<int8_t>(op_mode_index, 0x0, mode);
     } catch (...) {
     }
@@ -58,7 +58,8 @@ bool MotorKinco::switchMode(uint16_t mode) {
   }
   // HUNGVU
   RCLCPP_INFO(rclcpp::get_logger("canopen_kinco_driver"),
-              "Switching to mode %d", mode);
+              "Switching to mode %d",
+              mode);
   // HUNGVU
   ModeSharedPtr next_mode = allocMode(mode);
   if (!next_mode) {
@@ -73,7 +74,7 @@ bool MotorKinco::switchMode(uint16_t mode) {
     return false;
   }
 
-  { // disable mode handler
+  {  // disable mode handler
     std::scoped_lock lock(mode_mutex_);
 
     if (mode_id_ == mode && selected_mode_ &&
@@ -93,21 +94,22 @@ bool MotorKinco::switchMode(uint16_t mode) {
 
   bool okay = false;
 
-  { // wait for switch
+  {  // wait for switch
     std::unique_lock lock(mode_mutex_);
 
     std::chrono::steady_clock::time_point abstime =
-        std::chrono::steady_clock::now() + std::chrono::seconds(5);
+      std::chrono::steady_clock::now() + std::chrono::seconds(5);
     if (monitor_mode_) {
       while (mode_id_ != mode && mode_cond_.wait_until(lock, abstime) ==
-                                     std::cv_status::no_timeout) {
+                                   std::cv_status::no_timeout) {
       }
     } else {
       while (mode_id_ != mode && std::chrono::steady_clock::now() < abstime) {
-        lock.unlock(); // unlock inside loop
-        driver->universal_get_value<int8_t>(op_mode_display_index, 0x0); // poll
+        lock.unlock();  // unlock inside loop
+        driver->universal_get_value<int8_t>(op_mode_display_index,
+                                            0x0);  // poll
         std::this_thread::sleep_for(
-            std::chrono::milliseconds(100)); // wait some time
+          std::chrono::milliseconds(100));  // wait some time
         lock.lock();
       }
     }
@@ -118,7 +120,8 @@ bool MotorKinco::switchMode(uint16_t mode) {
     } else {
       RCLCPP_INFO(rclcpp::get_logger("canopen_kinco_driver"),
                   "Mode switch timed out. Because mode_id: %d, mode: %d",
-                  mode_id_, mode);
+                  mode_id_,
+                  mode);
       driver->universal_set_value<int8_t>(op_mode_index, 0x0, mode_id_);
     }
   }
@@ -131,14 +134,14 @@ bool MotorKinco::switchMode(uint16_t mode) {
 
 bool MotorKinco::switchState(const State402::InternalState &target) {
   std::chrono::steady_clock::time_point abstime =
-      std::chrono::steady_clock::now() + state_switch_timeout_;
+    std::chrono::steady_clock::now() + state_switch_timeout_;
   State402::InternalState state = state_handler_.getState();
   target_state_                 = target;
   while (state != target_state_) {
     std::unique_lock        lock(cw_mutex_);
     State402::InternalState next = State402::Unknown;
     bool                    success =
-        Command402::setTransition(control_word_, state, target_state_, &next);
+      Command402::setTransition(control_word_, state, target_state_, &next);
     if (!success) {
       RCLCPP_INFO(rclcpp::get_logger("canopen_kinco_driver"),
                   "Could not set transition.");
@@ -157,8 +160,9 @@ bool MotorKinco::switchState(const State402::InternalState &target) {
 
 bool MotorKinco::readState() {
   uint16_t old_sw,
-      sw = driver->universal_get_value<uint16_t>(
-          status_word_entry_index, 0x0); // TODO: added error handling
+    sw =
+      driver->universal_get_value<uint16_t>(status_word_entry_index,
+                                            0x0);  // TODO: added error handling
   old_sw = status_word_.exchange(sw);
 
   state_handler_.read(sw);
@@ -211,7 +215,9 @@ bool MotorKinco::readState() {
   return true;
 }
 
-void MotorKinco::handleRead() { readState(); }
+void MotorKinco::handleRead() {
+  readState();
+}
 void MotorKinco::handleWrite() {
   std::scoped_lock lock(cw_mutex_);
   control_word_ |= (1 << Command402::CW_Halt);
@@ -230,23 +236,26 @@ void MotorKinco::handleWrite() {
   }
   if (start_fault_reset_.exchange(false)) {
     this->driver->universal_set_value<uint16_t>(
-        control_word_entry_index, 0,
-        control_word_ & ~(1 << Command402::CW_Fault_Reset));
+      control_word_entry_index,
+      0,
+      control_word_ & ~(1 << Command402::CW_Fault_Reset));
   } else {
-    this->driver->universal_set_value<uint16_t>(control_word_entry_index, 0,
+    this->driver->universal_set_value<uint16_t>(control_word_entry_index,
+                                                0,
                                                 control_word_);
   }
 }
 
 bool MotorKinco::handleInit() {
   for (std::unordered_map<uint16_t, AllocFuncType>::iterator it =
-           mode_allocators_.begin();
-       it != mode_allocators_.end(); ++it) {
+         mode_allocators_.begin();
+       it != mode_allocators_.end();
+       ++it) {
     (it->second)();
   }
 
   uint16_t status_word_data_1 =
-      driver->universal_get_value<uint16_t>(status_word_entry_index, 0x0);
+    driver->universal_get_value<uint16_t>(status_word_entry_index, 0x0);
   if ((status_word_data_1 & 0x0007) == 0x0007) {
     // already enabled
     return true;
@@ -294,7 +303,7 @@ bool MotorKinco::handleHomming() {
   ModeSharedPtr m = allocMode(MotorBase::Homing);
   if (!m) {
     std::cout << "Homeing mode not supported" << std::endl;
-    return true; // homing not supported
+    return true;  // homing not supported
   }
 
   HomingMode *homing = dynamic_cast<HomingMode *>(m.get());
@@ -362,8 +371,8 @@ bool MotorKinco::handleHalt() {
     target_state_ = state;
   } else {
     target_state_ = State402::Quick_Stop_Active;
-    if (!Command402::setTransition(control_word_, state,
-                                   State402::Quick_Stop_Active, 0)) {
+    if (!Command402::setTransition(
+          control_word_, state, State402::Quick_Stop_Active, 0)) {
       std::cout << "Could not quick stop" << std::endl;
       return false;
     }

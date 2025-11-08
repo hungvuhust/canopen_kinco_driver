@@ -27,45 +27,53 @@ Command402::TransitionTable::TransitionTable() {
   /* 8*/ add(s::Operation_Enable, s::Ready_To_Switch_On, shutdown);
 
   Op switch_on((1 << CW_Quick_Stop) | (1 << CW_Enable_Voltage) |
-                   (1 << CW_Switch_On),
+                 (1 << CW_Switch_On),
                (1 << CW_Fault_Reset) | (1 << CW_Enable_Operation));
   /* 3*/ add(s::Ready_To_Switch_On, s::Switched_On, switch_on);
   /* 5*/ add(s::Operation_Enable, s::Switched_On, switch_on);
 
   Op enable_operation((1 << CW_Quick_Stop) | (1 << CW_Enable_Voltage) |
-                          (1 << CW_Switch_On) | (1 << CW_Enable_Operation),
+                        (1 << CW_Switch_On) | (1 << CW_Enable_Operation),
                       (1 << CW_Fault_Reset));
   /* 4*/ add(s::Switched_On, s::Operation_Enable, enable_operation);
   /*16*/ add(s::Quick_Stop_Active, s::Operation_Enable, enable_operation);
 
   Op quickstop((1 << CW_Enable_Voltage),
                (1 << CW_Fault_Reset) | (1 << CW_Quick_Stop));
-  /* 7*/ add(s::Ready_To_Switch_On, s::Quick_Stop_Active,
-             quickstop); // transit to Switch_On_Disabled
-  /*10*/ add(s::Switched_On, s::Quick_Stop_Active,
-             quickstop); // transit to Switch_On_Disabled
+  /* 7*/ add(s::Ready_To_Switch_On,
+             s::Quick_Stop_Active,
+             quickstop);  // transit to Switch_On_Disabled
+  /*10*/ add(s::Switched_On,
+             s::Quick_Stop_Active,
+             quickstop);  // transit to Switch_On_Disabled
   /*11*/ add(s::Operation_Enable, s::Quick_Stop_Active, quickstop);
 
   // fault reset
   /*15*/ add(s::Fault, s::Switch_On_Disabled, Op((1 << CW_Fault_Reset), 0));
 }
-State402::InternalState
-Command402::nextStateForEnabling(State402::InternalState state) {
+State402::InternalState Command402::nextStateForEnabling(
+  State402::InternalState state) {
   switch (state) {
-  case State402::Start: return State402::Not_Ready_To_Switch_On;
+    case State402::Start:
+      return State402::Not_Ready_To_Switch_On;
 
-  case State402::Fault:
-  case State402::Not_Ready_To_Switch_On: return State402::Switch_On_Disabled;
+    case State402::Fault:
+    case State402::Not_Ready_To_Switch_On:
+      return State402::Switch_On_Disabled;
 
-  case State402::Switch_On_Disabled: return State402::Ready_To_Switch_On;
+    case State402::Switch_On_Disabled:
+      return State402::Ready_To_Switch_On;
 
-  case State402::Ready_To_Switch_On: return State402::Switched_On;
+    case State402::Ready_To_Switch_On:
+      return State402::Switched_On;
 
-  case State402::Switched_On:
-  case State402::Quick_Stop_Active:
-  case State402::Operation_Enable: return State402::Operation_Enable;
+    case State402::Switched_On:
+    case State402::Quick_Stop_Active:
+    case State402::Operation_Enable:
+      return State402::Operation_Enable;
 
-  case State402::Fault_Reaction_Active: return State402::Fault;
+    case State402::Fault_Reaction_Active:
+      return State402::Fault;
   }
   throw std::out_of_range("state value is illegal");
 }
